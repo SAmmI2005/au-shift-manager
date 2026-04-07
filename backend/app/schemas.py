@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional, List
 
-# ---- Request bodies ----
+#  Request bodies 
 
 class ParseRequest(BaseModel):
     text: str
@@ -10,7 +10,7 @@ class ClaimRequest(BaseModel):
     employee: str
 
 
-# ---- Response models ----
+# Response models
 
 class ShiftOut(BaseModel):
     id: int

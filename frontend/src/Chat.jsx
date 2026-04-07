@@ -3,7 +3,8 @@ import { useState } from "react";
 export default function Chat({ onParse, loading }) {
   const [text, setText] = useState("");
 
-  async function handleSend() {
+  async function handleSubmit(e) {
+    e.preventDefault();
     const t = text.trim();
     if (!t) return;
     await onParse(t);
@@ -18,34 +19,35 @@ export default function Chat({ onParse, loading }) {
         Paste shift text in any format. MVP parser detects lines with <b>MM/DD</b> and <b>HH:MM - HH:MM</b>.
       </p>
 
-      <textarea
-        rows={10}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="Example:\n• Community Parks\n_ 8/13 09:00 - 17:00"
-        style={{
-          width: "100%",
-          padding: 10,
-          borderRadius: 10,
-          border: "1px solid #ccc",
-          resize: "vertical",
-        }}
-      />
+      <form onSubmit={handleSubmit}>
+        <textarea
+          rows={10}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Example:\n• Community Parks\n_ 8/13 09:00 - 17:00"
+          style={{
+            width: "100%",
+            padding: 10,
+            borderRadius: 10,
+            border: "1px solid #ccc",
+            resize: "vertical",
+          }}
+        />
 
-      <button
-        onClick={handleSend}
-        disabled={loading || !text.trim()}
-        style={{
-          marginTop: 10,
-          padding: "10px 14px",
-          borderRadius: 10,
-          border: "none",
-          cursor: loading ? "not-allowed" : "pointer",
-        }}
-      >
-        {loading ? "Working..." : "Send / Parse"}
-      </button>
+        <button
+          type="submit"
+          disabled={loading || !text.trim()}
+          style={{
+            marginTop: 10,
+            padding: "10px 14px",
+            borderRadius: 10,
+            border: "none",
+            cursor: loading ? "not-allowed" : "pointer",
+          }}
+        >
+          {loading ? "Working..." : "Send / Parse"}
+        </button>
+      </form>
     </div>
   );
 }
-

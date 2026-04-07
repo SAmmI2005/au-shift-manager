@@ -7,12 +7,12 @@ from .models import Shift
 from .schemas import ParseRequest, ParseResponse, ShiftOut, ClaimRequest
 from .parser import parse_shifts
 
-# Create tables on startup (MVP)
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# Allow React dev server (Vite default)
+# Allow React dev server (this importnat )
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -35,7 +35,7 @@ def parse_and_create(req: ParseRequest, db: Session = Depends(get_db)):
     for item in parsed:
         s = Shift(**item)
         db.add(s)
-        db.flush()   # assigns s.id before commit
+        db.flush()  
         created.append(s)
 
     db.commit()
@@ -47,6 +47,7 @@ def list_shifts(db: Session = Depends(get_db)):
 
 @app.post("/shifts/{shift_id}/claim", response_model=ShiftOut)
 def claim_shift(shift_id: int, req: ClaimRequest, db: Session = Depends(get_db)):
+
     s = db.query(Shift).get(shift_id)
     if not s:
         raise HTTPException(status_code=404, detail="Shift not found")
@@ -54,7 +55,7 @@ def claim_shift(shift_id: int, req: ClaimRequest, db: Session = Depends(get_db))
     if s.claimed >= s.slots:
         raise HTTPException(status_code=400, detail="Shift already filled")
 
-    # MVP: just increment claimed count (we’ll store who claimed later)
+    #  increments claimed count 
     s.claimed += 1
     db.commit()
     db.refresh(s)

@@ -1,20 +1,65 @@
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
-# MM/DD pattern
 DATE_RE = re.compile(r"(?<!\d)(\d{1,2})/(\d{1,2})(?!\d)")
+TIME_24_RE = re.compile(r"(\d{1,2}:\d{2})\s*[-–to]+\s*(\d{1,2}:\d{2})", re.IGNORECASE)
+TIME_AMPM_RE = re.compile(
+    r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*[-–]?\s*(?:to)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)",
+    re.IGNORECASE
+)
+SITE_INLINE_RE = re.compile(r"\bat\s+([a-zA-Z0-9 &\-]+)", re.IGNORECASE)
 
-# 24h time range like 09:00 - 17:00 or 21:00–06:00
-TIME_RE = re.compile(r"(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})")
+def to_24h(hour: int, minute: int, ampm: str) -> str:
+    ampm = ampm.lower()
+    if ampm == "am":
+        if hour == 12:
+            hour = 0
+    elif ampm == "pm":
+        if hour != 12:
+            hour += 12
+    return f"{hour:02d}:{minute:02d}"
+
+def resolve_date(line: str, year: int) -> str | None:
+    line_lower = line.lower()
+
+    if "tomorrow" in line_lower:
+        d = datetime.now() + timedelta(days=1)
+        return d.strftime("%Y-%m-%d")
+
+    if "today" in line_lower:
+        d = datetime.now()
+        return d.strftime("%Y-%m-%d")
+
+    md = DATE_RE.search(line)
+    if md:
+        month = int(md.group(1))
+        day = int(md.group(2))
+        return f"{year:04d}-{month:02d}-{day:02d}"
+
+    return None
+
+def resolve_time(line: str) -> tuple[str, str] | None:
+    tm24 = TIME_24_RE.search(line)
+    if tm24:
+        return tm24.group(1), tm24.group(2)
+
+    tm_ampm = TIME_AMPM_RE.search(line)
+    if tm_ampm:
+        start_hour = int(tm_ampm.group(1))
+        start_min = int(tm_ampm.group(2) or 0)
+        start_ampm = tm_ampm.group(3)
+
+        end_hour = int(tm_ampm.group(4))
+        end_min = int(tm_ampm.group(5) or 0)
+        end_ampm = tm_ampm.group(6)
+
+        start = to_24h(start_hour, start_min, start_ampm)
+        end = to_24h(end_hour, end_min, end_ampm)
+        return start, end
+
+    return None
 
 def parse_shifts(text: str):
-    """
-    MVP parser rules:
-    - A line starting with • * ● - becomes the current site heading
-    - A shift line must contain MM/DD and HH:MM-HH:MM
-    - Year inferred as current year
-    - slots/pay/role not extracted yet (we’ll add next)
-    """
     year = datetime.now().year
     current_site = ""
     shifts = []
@@ -24,33 +69,39 @@ def parse_shifts(text: str):
         if not line:
             continue
 
-        # Site heading
+        # Separate bullet/site heading
         if line.startswith(("•", "*", "●", "-")):
-            current_site = line.lstrip("•*●- ").strip()
+            maybe_site = line.lstrip("•*●- ").strip()
+
+            # If it's just a heading, store it and continue
+            if not DATE_RE.search(maybe_site) and not TIME_24_RE.search(maybe_site) and not TIME_AMPM_RE.search(maybe_site):
+                current_site = maybe_site
+                continue
+
+            # Otherwise keep parsing the same line as a shift
+            line = maybe_site
+
+        date = resolve_date(line, year)
+        time_range = resolve_time(line)
+
+        if not (date and time_range):
             continue
 
-        md = DATE_RE.search(line)
-        tm = TIME_RE.search(line)
-        if not (md and tm):
-            continue
+        start, end = time_range
 
-        month = int(md.group(1))
-        day = int(md.group(2))
-        date = f"{year:04d}-{month:02d}-{day:02d}"
+        site_match = SITE_INLINE_RE.search(line)
+        inline_site = site_match.group(1).strip() if site_match else ""
 
-        start = tm.group(1)
-        end = tm.group(2)
+        site = inline_site or current_site or "Unassigned Site"
 
         shifts.append({
             "date": date,
             "start": start,
             "end": end,
-            "site": current_site,
+            "site": site,
             "role": "",
             "slots": 1,
             "pay": None,
         })
 
     return shifts
-
-
